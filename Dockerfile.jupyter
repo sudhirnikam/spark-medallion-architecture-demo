@@ -1,0 +1,34 @@
+FROM jupyter/pyspark-notebook:python-3.11
+
+USER root
+
+# Download JARs for S3/MinIO and PostgreSQL
+RUN mkdir -p /usr/local/spark/jars && \
+    wget -P /usr/local/spark/jars https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
+    wget -P /usr/local/spark/jars https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar && \
+    wget -P /usr/local/spark/jars https://jdbc.postgresql.org/download/postgresql-42.5.4.jar &&\
+    wget -p https://repo1.maven.org/maven2/io/delta/delta-spark_2.13/3.2.1/delta-spark_2.13-3.2.1.jar
+
+# Create spark-defaults.conf to force cluster connection
+RUN echo "spark.master                     spark://spark-master:7077" >> /usr/local/spark/conf/spark-defaults.conf && \
+    echo "spark.submit.deployMode          client" >> /usr/local/spark/conf/spark-defaults.conf && \
+    echo "spark.executor.memory            1g" >> /usr/local/spark/conf/spark-defaults.conf && \
+    echo "spark.executor.cores             1" >> /usr/local/spark/conf/spark-defaults.conf && \
+    echo "spark.cores.max                  3" >> /usr/local/spark/conf/spark-defaults.conf
+
+# Set environment variables
+ENV SPARK_MASTER=spark://spark-master:7077
+ENV PYSPARK_SUBMIT_ARGS="--master spark://spark-master:7077 --jars /usr/local/spark/jars/hadoop-aws-3.3.4.jar,/usr/local/spark/jars/aws-java-sdk-bundle-1.12.262.jar,/usr/local/spark/jars/postgresql-42.5.4.jar pyspark-shell"
+ENV PYSPARK_PYTHON=/usr/bin/python3
+ENV PYSPARK_DRIVER_PYTHON=/opt/conda/bin/python
+
+# Install additional useful packages for data engineering
+RUN pip install --no-cache-dir \
+    boto3 \
+    psycopg2-binary \
+    pandas \
+    great-expectations
+
+USER ${NB_UID}
+
+WORKDIR /home/jovyan/work
